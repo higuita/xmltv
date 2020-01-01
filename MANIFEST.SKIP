@@ -1,7 +1,5 @@
 (^|/)\.\#
-(^|/)CVS(/|$)
 (^|/)do_not_dist(/|$)
-^ChangeLog\.old$
 ^MANIFEST\.SKIP$
 ^\.git/
 ^attic/

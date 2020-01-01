@@ -1,12 +1,10 @@
 # -*- mode: perl; coding: utf-8 -*- ###########################################
 #
-# tv_grab_fi: source specific grabber code for http://www.telkku.com
+# tv_grab_fi: source specific grabber code for https://www.telkku.com
 #
 ###############################################################################
 #
 # Setup
-#
-# VERSION: $Id$
 #
 # INSERT FROM HERE ############################################################
 package fi::source::telkku;
@@ -21,7 +19,6 @@ BEGIN {
 
 # Import from internal modules
 fi::common->import();
-fi::programmeStartOnly->import();
 
 # Description
 sub description { 'telkku.com' }
@@ -31,61 +28,44 @@ my %categories = (
   MOVIE  => "elokuvat",
 );
 
-# Fetch raw HTML and extract & parse JSON
-sub _getJSON($$$) {
-  my($date, $page, $keys) = @_;
+#
+# Unfortunately the embedded JSON data generated into the HTML page by
+# the server is (temporarily?) broken and unreliable. The web application
+# is not affected by this, because it always updates its state via XHR
+# calls to the JSON API endpoints.
+#
+sub _getJSON($) {
+  my($api_path) = @_;
 
-  # Fetch raw text
-  my $text = fetchRaw("http://www.telkku.com/tv-ohjelmat/$date/patch/koko-paiva");
+  # Fetch raw JSON text directly from API endpoint
+  my $text = fetchRaw("https://www.telkku.com/api/channel-groups/$api_path");
   if ($text) {
-    #
-    # All data is encoded in JSON in a script node
-    #
-    # <script>
-    #    window.__INITIAL_STATE__ = {...};
-    # </script>
-    #
-    my($match) = ($text =~ /window.__INITIAL_STATE__ = ({.+});/);
+    my $decoded = JSON->new->decode($text);
 
-    if ($match) {
-      my $decoded = JSON->new->decode($match);
-
-      if (ref($decoded) eq "HASH") {
-	my $data = $decoded;
-
-        #debug(5, JSON->new->pretty->encode($decoded));
-
-	# step through hashes using key sequence
-	foreach my $key (@{$keys}) {
-	  debug(5, "Looking for JSON key $key");
-	  return unless exists $data->{$key};
-	  $data = $data->{$key};
-	}
-	debug(5, "Found JSON data");
-
-	#debug(5, JSON->new->pretty->encode($data));
-	#debug(5, "KEYS: ", join(", ", sort keys %{$data}));
-	return($data);
-      }
+    if (ref($decoded) eq "HASH") {
+      # debug(5, JSON->new->pretty->encode($decoded));
+      return $decoded->{response};
     }
   }
 
   return;
 }
 
+# cache for group name to API ID mapping
+my %group2id;
+
 # Grab channel list
 sub channels {
 
   # Fetch & extract JSON sub-part
-  my $data = _getJSON("tanaan", "peruskanavat",
-		      ["channelGroups",
-		       "channelGroupsArray"]);
+  my $data = _getJSON("");
 
   #
-  # Channels data has the following structure
+  # channel-groups response has the following structure
   #
   #  [
   #    {
+  #      id       => "default_builtin_channelgroup1"
   #      slug     => "peruskanavat",
   #      channels => [
   #                    {
@@ -106,15 +86,19 @@ sub channels {
 
     foreach my $item (@{$data}) {
       if ((ref($item)             eq "HASH")  &&
+	  (exists $item->{id})                &&
 	  (exists $item->{slug})              &&
 	  (exists $item->{channels})          &&
 	  (ref($item->{channels}) eq "ARRAY")) {
-	my $group    = $item->{slug};
-	my $channels = $item->{channels};
+	my($api_id, $group, $channels) = @{$item}{qw(id slug channels)};
 
-	if (defined($group) && length($group) &&
+	if (defined($api_id) && length($api_id) &&
+	    defined($group)  && length($group)  &&
 	    (ref($channels) eq "ARRAY")) {
-	  debug(2, "Source telkku.com found group '$group' with " . scalar(@{$channels}) . " channels");
+	  debug(2, "Source telkku.com found group '$group' ($api_id) with " . scalar(@{$channels}) . " channels");
+
+	  # initialize group name to API ID map
+	  $group2id{$group} = $api_id;
 
 	  foreach my $channel (@{$channels}) {
 	    if (ref($channel) eq "HASH") {
@@ -143,24 +127,42 @@ sub channels {
   return;
 }
 
+sub _group2id($) {
+  my($group) = @_;
+
+  # Make sure group to ID map is initialized
+  channels() unless %group2id;
+
+  return $group2id{$group};
+}
+
 # Grab one day
 sub grab {
   my($self, $id, $yesterday, $today, $tomorrow, $offset) = @_;
 
   # Get channel number from XMLTV id
-  return unless my($channel, $group) = ($id =~ /^([\w-]+)\.(\w+)\.telkku\.com$/);
+  return unless my($channel, $group) = ($id =~ /^([\w-]+)\.([\w-]+)\.telkku\.com$/);
 
-  # Fetch & extract JSON sub-part
-  my $data = _getJSON($today, $group,
-		      ["offeringByChannelGroup",
-		       $group,
-		       "offering",
-		       "publicationsByChannel"]);
+  # Map group name to API ID
+  return unless my $api_id = _group2id($group);
+
+  #
+  # API parameters:
+  #
+  #  - date is $today
+  #  - range is 24 hours (start 00:00:00.000 - end 00:00:00.000)
+  #  - max. 1000 entries per channel
+  #  - detailed information
+  #
+  # Response will include programmes from $yesterday that end $today, to
+  # $tomorrow where a programme of $today ends.
+  #
+  my $data = _getJSON("$api_id/offering?endTime=00:00:00.000&limit=1000&startTime=00:00:00.000&view=PublicationDetails&tvDate=" . $today->ymdd());
 
   #
   # Programme data has the following structure
   #
-  #  [
+  #  publicationsByChannel => [
   #    {
   #      channel      => {
   #                        id => "yle-tv1",
@@ -181,10 +183,11 @@ sub grab {
   #    ...
   #  ]
   #
-  if (ref($data) eq "ARRAY") {
+  if ((ref($data)                          eq "HASH")  &&
+      (ref($data->{publicationsByChannel}) eq "ARRAY")) {
     my @objects;
 
-    foreach my $item (@{$data}) {
+    foreach my $item (@{ $data->{publicationsByChannel} }) {
       if ((ref($item)                 eq "HASH")  &&
 	  (ref($item->{channel})      eq "HASH")  &&
 	  (ref($item->{publications}) eq "ARRAY") &&

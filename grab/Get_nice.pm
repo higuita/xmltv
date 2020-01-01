@@ -1,5 +1,3 @@
-# $Id$
-#
 # Library to wrap LWP::UserAgent to put in a random delay between
 # requests and set the User-Agent string.  We really should be using
 # LWP::RobotUI but this is better than nothing.
@@ -23,7 +21,6 @@
 # get_nice_tree().
 # Alternatively, get_nice_json() will get you a JSON object,
 # or get_nice_xml() will get a XML::Parser 'Tree' object
-#
 
 use strict;
 
@@ -76,7 +73,7 @@ sub get_nice( $ ) {
 #      before parsing.
 #  ii) convert incoming page to UNICODE using this codepage (use "UTF-8" for
 #      strict utf-8)
-# iii) a hashref containing options to configure the HTML::TreeBuilder object 
+# iii) a hashref containing options to configure the HTML::TreeBuilder object
 #      before parsing
 #
 sub get_nice_tree( $;$$$ ) {
@@ -124,7 +121,7 @@ sub get_nice_xml( $;$$ ) {
     return $t;
 }
 
-# Fetch page and return as JSON::PP object.
+# Fetch page and return as JSON object.
 # Optional arguments:
 # i) a function to put the page data through (eg, to clean up bad
 # characters) before parsing.
@@ -132,11 +129,11 @@ sub get_nice_xml( $;$$ ) {
 #
 sub get_nice_json( $;$$ ) {
     my ($uri, $filter, $utf8) = @_;
-    require JSON::PP;
+    require JSON;
     my $content = get_nice $uri;
     $content = $filter->($content) if $filter;
     $utf8 = defined $utf8 ? 1 : 0;
-    my $t = JSON::PP->new()->utf8($utf8)->decode($content) or die "cannot parse content of $uri\n";
+    my $t = JSON->new()->utf8($utf8)->decode($content) or die "cannot parse content of $uri\n";
     return $t;
 }
 
@@ -169,8 +166,11 @@ sub get_nice_aux( $ ) {
     # expose the response object for those grabbers which need to process the headers, status code, etc.
     $Response = $r;
 
-    # set flag if last fetch was from cache 
-    $last_get_from_cache = (defined $r->{'_headers'}{'x-cached'} && $r->{'_headers'}{'x-cached'} == 1);
+    # Set flag if last fetch was from local HTTP::Cache::Transparent cache.
+    # Check for presence of both x-content-unchanged and x-cached headers.
+    $last_get_from_cache = (defined $r->{'_headers'}{'x-content-unchanged'}
+                         && defined $r->{'_headers'}{'x-cached'}
+                         && $r->{'_headers'}{'x-cached'} == 1);
 
     if ($r->is_error) {
         # At the moment download failures seem rare, so the script dies if
@@ -187,7 +187,7 @@ sub get_nice_aux( $ ) {
 
 }
 
-# Fetch page via a JSON object in the Content and return as a JSON object.  
+# Fetch page via a JSON object in the Content and return as a JSON object.
 # Arguments:
 #    URI to post to
 #    JSON object with the AJAX data to be posted e.g. "{ 'programId':'123456', 'channel':'BBC'}"
@@ -196,11 +196,11 @@ sub post_nice_json( $$ ) {
     my $url = shift;
     my $json = shift;
 
-    require JSON::PP;
+    require JSON;
 
     if (defined $last_get_time) {
         # A page has already been retrieved recently.  See if we need
-        # to sleep for a while before getting the next page 
+        # to sleep for a while before getting the next page
         #
         my $next_get_time = $last_get_time + (rand $Delay) + $MinDelay;
         my $sleep_time = $next_get_time - time();
@@ -219,7 +219,7 @@ sub post_nice_json( $$ ) {
         $errors{$url} = $r->status_line;
         return undef;
     } else {
-        my $content = JSON::PP->new()->utf8(1)->decode($r->content) or die "cannot parse content of $url\n";
+        my $content = JSON->new()->utf8(1)->decode($r->content) or die "cannot parse content of $url\n";
         return $content;
     }
 }

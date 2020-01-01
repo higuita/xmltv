@@ -1,6 +1,3 @@
-#
-# $Id$
-#
 # The IMDB file contains two packages:
 # 1. XMLTV::IMDB::Cruncher package which parses and manages IMDB "lists" files
 #    from ftp.imdb.com
@@ -1460,7 +1457,7 @@ sub checkFiles () {
 	else { die }
     }
     if ( $self->{downloadMissingFiles} ) {
-	my $baseUrl = 'ftp://ftp.fu-berlin.de/pub/misc/movies/database';
+	my $baseUrl = 'ftp://ftp.fu-berlin.de/pub/misc/movies/database/frozendata';
 	foreach ( sort keys %missingListFiles ) {
 	    my $url = "$baseUrl/$_.list.gz";
 	    my $filename = delete $missingListFiles{$_};

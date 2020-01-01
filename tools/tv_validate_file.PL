@@ -1,10 +1,7 @@
-# Generate tv_validate_file from tv_validate_file.in.  
+# Generate tv_validate_file from tv_validate_file.in.
 #
 # The second argument is the share directory for the final
 # installation.
-#
-# $Id$
-#
 
 use IO::File;
 my $out = shift @ARGV; die "no output file given" if not defined $out;

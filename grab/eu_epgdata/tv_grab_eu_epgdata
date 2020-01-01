@@ -117,15 +117,15 @@ There's no proper support for channels with locally different schedules. For exa
 if your EPG package is a German one, you'll get the EPG schedule for Germany
 even if you preferred the Swiss schedule which is also available in the data (for some channels at least).
 
-Timezones are not handled correctly. Currently, you have to enter your 
-time zone manually during the configure step. You have to do this every 
-time your time zone changes, eg for daylight saving time 
+Timezones are not handled correctly. Currently, you have to enter your
+time zone manually during the configure step. You have to do this every
+time your time zone changes, eg for daylight saving time
 ("Sommerzeit" and "Normalzeit" for my fellow Germans).
 I'll try to have this fixed for the next XMLTV release.
 Please see this thread for further discussion and some additional issues:
     http://thread.gmane.org/gmane.comp.tv.xmltv.devel/7919
 FYI: you can modify the time zone directly in the config file which is
-usually located at ~/.xmltv/tv_grab_eu_epgdata.conf or 
+usually located at ~/.xmltv/tv_grab_eu_epgdata.conf or
 ~/.mythtv/FOO.xmltv where FOO is the name of your video source in MythTV.
 
 If the data source gives us data for one day, they'll also cover a part of the following day.
@@ -191,7 +191,7 @@ my ($opt, $conf) = ParseOptions({
     capabilities     => [qw/baseline manualconfig tkconfig apiconfig cache preferredmethod/],
     stage_sub        => \&config_stage,
     listchannels_sub => \&list_channels,
-    version          => '$Id$',
+    version          => "$XMLTV::VERSION",
     description      => 'Parts of Europe (commercial) (www.epgdata.com)',
     preferredmethod  => 'allatonce',
 });
@@ -445,7 +445,9 @@ sub printepg {
         # However, it's not listed in qy.dtd
         # my $hd_video = $sendung->first_child('XXX')->text;
 
-        our %prog = ('channel' => $chanid,
+        my $iconsrc	 = $sendung->first_child('d40')->text;
+
+	our %prog = ('channel' => $chanid,
                      'start'   => format_start_stop($start),
                      'stop'    => format_start_stop($stop),
                      'title'   => [ [ $title ] ]);
@@ -464,7 +466,7 @@ sub printepg {
             push @{$prog{'category'}}, [ 'series' ];
         } elsif ($category eq '300') {
             push @{$prog{'category'}}, [ 'sports' ];
-        } elsif ($category eq '400' || $category eq '500' || $category eq '600') {
+        } elsif ($category eq '400' || $category eq '500' || $category eq '600' || $category eq '700') {
             push @{$prog{'category'}}, [ 'tvshow' ];
         }
 
@@ -566,7 +568,11 @@ sub printepg {
             $production_year =~ s/(\d*).*/$1/;	#take only first year
             $prog{'date'} = $production_year;
         }
-
+        
+	if (length($iconsrc) > 0) {
+	    $prog{'icon'} = [ { 'src' => $iconsrc } ];
+        }
+	
         $writer->write_programme(\%main::prog);
     }
     $twig->purge;

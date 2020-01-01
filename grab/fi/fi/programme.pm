@@ -6,14 +6,13 @@
 #
 # Setup
 #
-# VERSION: $Id$
-#
 # INSERT FROM HERE ############################################################
 package fi::programme;
 use strict;
 use warnings;
 use Carp;
 use POSIX qw(strftime);
+use URI::Escape qw(uri_unescape);
 
 # Import from internal modules
 fi::common->import();
@@ -64,15 +63,33 @@ sub episode {
     push(@{ $self->{episode} }, [$episode, $language]);
   }
 }
-sub season_episode {
-  my($self, $season, $episode) = @_;
-  # only accept a pair of valid, positive integers
-  if (defined($season) && defined($episode)) {
-    $season  = int($season);
-    $episode = int($episode);
-    if (($season  > 0) && ($episode > 0)) {
-      $self->{season}         = $season;
-      $self->{episode_number} = $episode;
+sub episode_number {
+  my($self, $episode_number) = @_;
+  # only accept valid, positive integers
+  if (defined($episode_number)) {
+    $episode_number = int($episode_number);
+    if ($episode_number > 0) {
+      $self->{episode_number} = $episode_number;
+    }
+  }
+}
+sub episode_total {
+  my($self, $episode_total) = @_;
+  # only accept valid, positive integers
+  if (defined($episode_total)) {
+    $episode_total = int($episode_total);
+    if ($episode_total > 0) {
+      $self->{episode_total} = $episode_total;
+    }
+  }
+}
+sub season {
+  my($self, $season) = @_;
+  # only accept valid, positive integers
+  if (defined($season)) {
+    $season = int($season);
+    if ($season > 0) {
+      $self->{season} = $season;
     }
   }
 }
@@ -137,12 +154,13 @@ sub dump {
   my $episode     = $self->{episode_number};
   my $season      = $self->{season};
   my $subtitle    = $self->{episode};
+  my $total       = $self->{episode_total};
 
   #
   # Programme post-processing
   #
   # Parental level removal (catch also the duplicates)
-  $title =~ s/(?:\s+\((?:S|T|7|9|12|16|18)\))+\s*$//
+  $title =~ s/(?:\s+\((?:S|T|K?7|K?9|K?12|K?16|K?18)\))+\s*$//
       if $title_strip_parental;
   #
   # Title mapping
@@ -221,7 +239,7 @@ sub dump {
   elsif ((defined($description))              &&
 	 (exists $series_description{$title}) &&
 	 (($left, $special, $right) = ($description =~ $match_description))) {
-    my $desc_subtitle;
+    my($desc_subtitle, $desc_total);
 
     # Check for "Kausi <season>, osa <episode>. <maybe sub-title>...."
     if (my($desc_season, $desc_episode, $remainder) =
@@ -242,34 +260,38 @@ sub dump {
 	    $right = $remainder;
 	}
 
-    # Check for "Kausi <season>. Jakso <episode>/<# of episodes>. <sub-title>...."
-    } elsif (($desc_season, $desc_episode, $remainder) =
-	($description =~ m,^Kausi\s+(\d+)\.\s+Jakso\s+(\d+)(?:/\d+)?\.\s*(.*)$,)) {
+    # Check for "Kausi <season>[.,] (Jakso )?<episode>/<# of episodes>. <sub-title>...."
+    } elsif (($desc_season, $desc_episode, $desc_total, $remainder) =
+	($description =~ m!^Kausi\s+(\d+)[.,]\s+(?:Jakso\s+)?(\d+)(?:/(\d+))?\.\s*(.*)$!)) {
 	$season  = $desc_season;
 	$episode = $desc_episode;
-
-	# Repeat the above match on remaining description
-	($left, $special, $right) = ($remainder =~ $match_description);
-
-    # Check for "Kausi <season>, <episode>/<# of episodes>. <sub-title>...."
-    } elsif (($desc_season, $desc_episode, $remainder) =
-	($description =~ m!^Kausi\s+(\d+),\s+(\d+)(?:/\d+)?\.\s*(.*)$!)) {
-	$season  = $desc_season;
-	$episode = $desc_episode;
+	$total   = $desc_total    if $desc_total;
 
 	# Repeat the above match on remaining description
 	($left, $special, $right) = ($remainder =~ $match_description);
 
     # Check for "<sub-title>. Kausi <season>, (jakso )?<episode>/<# of episodes>...."
-    } elsif (($desc_subtitle, $desc_season, $desc_episode, $remainder) =
-	     ($description =~ m!^(.+)\s+Kausi\s+(\d+),\s+(?:jakso\s+)?(\d+)(?:/\d+)?\.\s*(.*)$!)) {
+    } elsif (($desc_subtitle, $desc_season, $desc_episode, $desc_total, $remainder) =
+	     ($description =~ m!^(.+)\s+Kausi\s+(\d+),\s+(?:jakso\s+)?(\d+)(?:/(\d+))?\.\s*(.*)$!)) {
 	$left    = $desc_subtitle;
 	$season  = $desc_season;
 	$episode = $desc_episode;
+	$total   = $desc_total    if $desc_total;
 
 	# Remainder is already the final episode description
 	$right = $remainder;
 	undef $special;
+
+    # Check for "<episode>/<# of episodes>. <sub-title>...."
+    } elsif (($desc_episode, $desc_total, $remainder) =
+	     ($description =~ m!^(\d+)/(\d+)\.\s+(.*)$!)) {
+	# default to season 1
+	$season  = 1              unless defined($season);
+	$episode = $desc_episode;
+	$total   = $desc_total;
+
+	# Repeat the above match on remaining description
+	($left, $special, $right) = ($remainder =~ $match_description);
     }
     if (defined($left)) {
 	unless (defined($special)) {
@@ -314,8 +336,13 @@ sub dump {
     debug(4, "XMLTV programme description: $description");
   }
   if (defined($season) && defined($episode)) {
-    $xmltv{'episode-num'} =  [[ ($season - 1) . '.' . ($episode - 1) . '.', 'xmltv_ns' ]];
-    debug(4, "XMLTV programme season/episode: $season/$episode");
+    if (defined($total)) {
+      $xmltv{'episode-num'} =  [[ ($season - 1) . '.' . ($episode - 1) . '/' . $total . '.', 'xmltv_ns' ]];
+      debug(4, "XMLTV programme season/episode: $season/$episode of $total");
+    } else {
+      $xmltv{'episode-num'} =  [[ ($season - 1) . '.' . ($episode - 1) . '.', 'xmltv_ns' ]];
+      debug(4, "XMLTV programme season/episode: $season/$episode");
+    }
   }
 
   $writer->write_programme(\%xmltv);
@@ -329,6 +356,11 @@ sub parseConfigLine {
   # Extract words
   my($command, $keyword, $param) = split(' ', $line, 3);
 
+  # apply URI unescaping if string contains '%XX'
+  if ($param =~ /%[0-9A-Fa-f]{2}/) {
+      $param = uri_unescape($param);
+  }
+
   if ($command eq "series") {
     if ($keyword eq "description") {
       $series_description{$param}++;
@@ -340,9 +372,9 @@ sub parseConfigLine {
     }
   } elsif ($command eq "title") {
       if (($keyword eq "map") &&
-	  # Accept "title" and 'title' for each parameter
+	  # Accept "title" and 'title' for each parameter - 2nd may be empty
 	  (my(undef, $from, undef, $to) =
-	   ($param =~ /^([\'\"])([^\1]+)\1\s+([\'\"])([^\3]+)\3/))) {
+	   ($param =~ /^([\'\"])([^\1]+)\1\s+([\'\"])([^\3]*)\3/))) {
 	  debug(3, "title mapping from '$from' to '$to'");
 	  $from = qr/^\Q$from\E/;
 	  push(@title_map, sub { $_[0] =~ s/$from/$to/ });

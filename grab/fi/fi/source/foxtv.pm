@@ -1,12 +1,10 @@
 # -*- mode: perl; coding: utf-8 -*- ###########################################
 #
-# tv_grab_fi: source specific grabber code for http://www.foxtv.fi
+# tv_grab_fi: source specific grabber code for https://www.foxtv.fi
 #
 ###############################################################################
 #
 # Setup
-#
-# VERSION: $Id$
 #
 # INSERT FROM HERE ############################################################
 package fi::source::foxtv;
@@ -39,7 +37,7 @@ sub grab {
 
   # Fetch & parse HTML (do not ignore HTML5 <section>)
   # Anything beyond 14 days results in 404 error -> ignore errors
-  my $root = fetchTree("http://www.foxtv.fi/ohjelmaopas/fox/$today",
+  my $root = fetchTree("https://www.foxtv.fi/ohjelmaopas/fox/$today",
 		       undef, 1, 1);
   if ($root) {
 
@@ -84,7 +82,7 @@ sub grab {
 	      $title = $title->as_text();
 
 	      my($episode_name, $season, $episode_number) =
-		$extra->as_text() =~ /^(.*)?,\s+Kausi\s+(\d+)\s+\S\s+Jakso\s+(\d+)$/
+		$extra->as_text() =~ /^(.*)?,\s+Kausi\s+(\d+)\s+\S\s+Jakso\s+(\d+)\s*$/
 		  if $extra;
 
 	      # Cleanup some of the most common inconsistencies....
@@ -116,7 +114,8 @@ sub grab {
 	      my $object = appendProgramme($opaque, $hour, $minute, $title);
 	      $object->description($desc);
 	      $object->episode($episode_name, "fi");
-	      $object->season_episode($season, $episode_number);
+	      $object->season($season);
+	      $object->episode_number($episode_number);
 	    }
 	  }
 	}

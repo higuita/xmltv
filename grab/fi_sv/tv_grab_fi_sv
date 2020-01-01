@@ -72,8 +72,6 @@ like tv_grab_uk_rt, tv_grab_se_swedb and tv_grab_fi.
 
 =cut
 
-my $_version = '$Id$';
-
 use strict;
 use warnings;
 use utf8;
@@ -82,6 +80,7 @@ use DateTime;
 use Encode;
 use HTML::TreeBuilder;
 use IO::Scalar;
+use XMLTV;
 use XMLTV::Ask qw/say/;
 use XMLTV::Configure::Writer;
 use XMLTV::Get_nice 0.005070;
@@ -94,7 +93,7 @@ sub t;
 # my $DATA_SITE_ROOT  = 'https://areena.yle.fi/'; # Finnish
 my $DATA_SITE_ROOT  = 'https://arenan.yle.fi/';   # Swedish
 my $GRABBER_NAME    = 'tv_grab_fi_sv';
-(my $GRABBER_VERSION) = $_version =~ qr/$GRABBER_NAME,v ([\d\.]*) /;
+my $GRABBER_VERSION = "$XMLTV::VERSION";
 my $XML_ENCODING    = 'utf-8';
 my $LANGUAGE_CODE   = 'sv';
 
@@ -236,7 +235,7 @@ my ($opt, $conf) = ParseOptions(
     capabilities => [qw/baseline manualconfig apiconfig/],
     stage_sub => \&config_stage,
     listchannels_sub => \&list_channels,
-    version => $_version,
+    version => $GRABBER_VERSION,
     description => "Finland (Swedish)",
     defaults => { days => 14, offset => 0, quiet => 0, debug => 0 },
 });
@@ -444,11 +443,11 @@ sub write_listings_data
         my @t_channels = $tree->look_down('_tag' => 'li', 'class' => 'guide-channels__channel');
         say '  Found '.scalar @t_channels.' channels' if $opt->{debug};
         next DAY if scalar @t_channels == 0;
-        
+
         # Can't use foreach because of clumpidx processing below
         CHANNEL:
         for (my $j = 0; $j < scalar @t_channels; $j++)
-        { 
+        {
             my $t_channel = $t_channels[$j];
 
             my $chan_id_raw = $t_channel->look_down('_tag' => 'div')->attr('aria-label');
@@ -583,7 +582,7 @@ sub write_listings_data
                 # extract original movie title
 
                 # Create correctly-indexed programme season/episode numbering
-                # 
+                #
                 # series number is zero-indexed
                 if (defined $p_season && $p_season > 0)
                 {
@@ -646,7 +645,7 @@ sub write_listings_data
 
                 # If the previous programme on this channel overlaps with the start time of this programme,
                 # trust our start time and update the stop time of the previous programme
-                if (exists $previous_programmes->{$c_channel_id} 
+                if (exists $previous_programmes->{$c_channel_id}
                        and $previous_programmes->{$c_channel_id}->{'stop'} gt $p_dtstart)
                 {
                     say("      ** Overlap detected, updating previous programme's stop time") if !$opt->{quiet};

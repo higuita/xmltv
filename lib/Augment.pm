@@ -1,9 +1,3 @@
-#
-# $Id$
-#
-#
-#
-
 =pod
 
 =head1 NAME
@@ -55,7 +49,7 @@ Print the lists of actions taken and suggestions for further fixups.
 
 =item B<B<end>>
 
-Do any final processing before exit (e.g. close the log file).
+Do any final processing before exit (e.g. close the log file if necessary).
 
 =back
 
@@ -68,7 +62,7 @@ Possible parameters:
       config     => filename of config file to read (if omitted then no config file will be used)
       encoding   => assumed encoding of the rules file (default = UTF-8)
       stats      => whether to print the audit stats in the log (values = 0,1) (default = 1)
-      log        => filename of output log (default = augment.log)
+      log        => filename of output log
       debug      => debug level (values 0-10) (default = no debug)
                         note debug level > 3 is not likely to be of much use unless you are developing code
 
@@ -101,7 +95,7 @@ Possible parameters:
         # log the stats
         $augment->printInfo();
 
-        # close the log file
+        # close the log file if necessary
         $augment->end();
 
 Note: you are responsible for reading/writing to the XMLTV .xml file; the package
@@ -138,7 +132,7 @@ use XMLTV::Date 0.005066 qw( time_xmltv_to_epoch );
 
 use Encode;
 
-our $VERSION = 0.005070;
+our $VERSION = 0.006001;
 
 use base 'Exporter';
 our @EXPORT = qw(setEncoding inputChannel augmentProgramme printInfo end);
@@ -197,7 +191,12 @@ sub new
 	# Turn on debug. Note: debug is a 'level between 1-10.
     $debug = ( $self->{'debug'} || 0 );
 
-	open_log( $self->{'log'} || '' );
+	if (exists $self->{'log'} && defined $self->{'log'} && $self->{'log'} ne '') {
+		open_log( $self->{'log'} );
+	}
+	else {
+		$self->{'stats'} = 0;
+	}
 
 	# Load the requested options from the config file
 	$self->{'options_all'} = 1;
@@ -818,7 +817,11 @@ sub extract_numbering () {
     #        also the 'series', 'season' and 'episode' text in the regexs
     my $lang_words = qr/one|two|three|four|five|six|seven|eight|nine/i;
 
-    #
+    # By default, we do not update existing numbering if also extracted from
+    # series/episode/part fields
+    $self->{'options'}{'update_existing_numbering'} = 0
+            unless exists $self->{'options'}{'update_existing_numbering'};
+
     _d(4,"\t extract_numbering: $field : in  : ","<$prog->{$elem}>");
 
     # Theoretically it's possible to do this in one regex but it gets too unwieldy when we start catering
@@ -1108,7 +1111,7 @@ sub extract_numbering () {
     #   In the Mix. ( 2/6 ).
     #
     # Should not match --v
-    #   £20,000.
+    #   Â£20,000.
     #   20,000
     #   the 24.
     #   go 24.
@@ -1198,8 +1201,14 @@ sub extract_numbering () {
 		my ($text, $key, $val) = @$_;
 		if (defined $val && $val ne '' && $val > 0) {
 			# do we already have a number?
-			if (defined $prog->{$key}  &&  $prog->{$key} != $val) {
-				l(sprintf("\t %s number (%s) already defined. Ignoring different %s number (%s) in %s.", ucfirst($text), $prog->{'_episode_num'}, $text, $val, $field));
+			if (defined $prog->{$key} && $prog->{$key} != $val) {
+                if ($self->{'options'}{'update_existing_numbering'}) {
+                    l(sprintf("\t %s number (%s) already defined. Updating with new %s number (%s) in %s.", ucfirst($text), $prog->{$key}, $text, $val, $field));
+                    $prog->{$key} = $val;
+                }
+                else {
+                    l(sprintf("\t %s number (%s) already defined. Ignoring different %s number (%s) in %s.", ucfirst($text), $prog->{$key}, $text, $val, $field));
+                }
 			} else {
 				l(sprintf("\t %s number found: %s %s (from %s)", ucfirst($text), $text, $val, $field));
 				$prog->{$key} = $val;
@@ -1208,16 +1217,26 @@ sub extract_numbering () {
 	}
 
 
-	# Check that source episode number is not greater than number of episodes
-	# Rather than discard the episode number, we discard the total instead which
+	# Check that a programme's given series/episode/part number is not greater than
+    # the total number of series/episodes/parts.
+    #
+	# Rather than discard the given number, we discard the total instead, which
 	# is more likely to be incorrect based on observation.
 	#
-	if (defined $prog->{'_episode_total'}) {
-		if ($prog->{'_episode_num'} > $prog->{'_episode_total'}) {
-			l(sprintf("\t Bad episode total found: episode %s of %s, discarding total (from %s)",$prog->{'_episode_num'}, $prog->{'_episode_total'}, $field));
-			$prog->{'_episode_total'} = 0;
-		}
-	}
+    my @comps = ( [ 'series',  '_series_num',  '_series_total',  ],
+                  [ 'episode', '_episode_num', '_episode_total', ],
+                  [ 'part',    '_part_num',    '_part_total',    ],
+                );
+
+    foreach (@comps) {
+        my ($key, $key_num, $key_total) = @$_;
+        if (defined $prog->{$key_num} && defined $prog->{$key_total}) {
+            if ($prog->{$key_num} > $prog->{$key_total}) {
+                l(sprintf("\t Bad %s total found: %s %s of %s, discarding total (from %s)", $key, $key, $prog->{$key_num}, $prog->{$key_total}, $field));
+                $prog->{$key_total} = 0;
+            }
+        }
+    }
 
 }
 
@@ -1300,6 +1319,7 @@ sub process_user_rules () {
 				 '_episode_total' 	=> $episode_num->{'episode_total'},
 				 '_part_num' 		=> $episode_num->{'part'},
 				 '_part_total' 		=> $episode_num->{'part_total'},
+                 '_has_numbering'   => (defined $episode_num ? 1 : 0),
 				 };
 
 	_d(4,'_Prog, before title fixups:',dd(4,$_prog));
@@ -1346,6 +1366,10 @@ sub process_user_rules () {
     # titles split out in fixups of types 2-4 above
     $self->process_replacement_titles($_prog);
 
+    # Remove programme numbering for a 'corrected' title
+    # (optionally limited to a specified channel identifier)
+    $self->process_remove_numbering_from_programmes($_prog); # (type=16)
+
 
     # Next, process subtitles to make them consistent
 
@@ -1368,7 +1392,6 @@ sub process_user_rules () {
 
 	# Add specified categories to all progs on a channel
 	$self->process_add_genres_to_channel($_prog);       # (type=15)
-
 
 	_d(4,'_Prog, after title fixups:',dd(4,$_prog));
 
@@ -2594,6 +2617,87 @@ sub process_add_genres_to_channel () {
 }
 
 
+=item B<process_remove_numbering_from_programmes>
+
+Rule #16
+
+Remove episode numbering from a given programme title (on an optionally-specified channel).
+
+  If title matches the one in the prog, all programme numbering for the programme
+  is removed, on any channel. An optional channel identifier can be provided to
+  restrict the removal of programme numbering to the given channel.
+
+  rule: 16|Bedtime Story
+  in : "CBeebies Bedtime Story" episode-num ".700."
+  out: "CBeebies Bedtime Story" episode-num ""
+
+  rule: 16|CBeebies Bedtime Story~cbeebies.bbc.co.uk
+  in : "CBeebies Bedtime Story" episode-num ".700."
+  out: "CBeebies Bedtime Story" episode-num ""
+
+Remember to specify the optional channel limiter if you have good programme numbering
+for a given programme title on some channels but not others.
+
+=cut
+
+# Rule 16
+#
+# Remove episode numbering from a given programme title (on an optionally-specified channel).
+#
+# Data type 16
+#     The content contains a title value, followed by an optional channel (separated by a tilde (~)).
+#     Use case: can remove programme numbering from a specific title if it is regularly wrong or inconsistent over time.
+#
+sub process_remove_numbering_from_programmes () {
+    my ($self, $prog) = @_;
+    my $me = self();
+    if ( ! $self->{'options_all'} && ! $self->{'options'}{$me} ) { return 0; }
+    _d(3,self());
+
+    my $ruletype = 16;
+    if (!defined $self->{'rules'}->{$ruletype}) { return 0; }
+
+    if ( defined $prog->{'_title'} && $prog->{'_has_numbering'} ) {
+        #_d(4,dd(4,$prog->{'_title'}));
+
+        my $idx = lc(substr $prog->{'_title'}, 0, 2);
+
+        LOOP:
+        foreach (@{ $self->{'rules'}->{$ruletype}->{$idx} }) {
+            my ( $line, $key, $value ) = ( $_->{'line'}, $_->{'key'}, $_->{'value'} );
+            _d(4,"\t $line, $key, $value");
+
+            if ($prog->{'_title'} eq $key) {
+                #_d(4,dd(4,$prog->{'_channel'}));
+
+                my @num_keys = ( '_series_num',  '_series_total',
+                                 '_episode_num', '_episode_total',
+                                 '_part_num',    '_part_total',
+                               );
+                # if an optional channel is not specified in the rule definition,
+                # $value will be the empty string
+                if ($value ne '') {
+                    if ($prog->{'_channel'} eq $value) {
+                        $prog->{$_} = '' foreach @num_keys;
+                        delete $prog->{'_has_numbering'};
+                        l(sprintf("\t Removed all programme numbering for title '%s' on channel '%s' (#%s.%s)",
+                                $key, $value, $ruletype, $line));
+                    }
+                }
+                else {
+                    $prog->{$_} = '' foreach @num_keys;
+                    delete $prog->{'_has_numbering'};
+                    l(sprintf("\t Removed all programme numbering for title '%s' (#%s.%s)",
+                            $key, $ruletype, $line));
+                }
+
+                last LOOP;
+            }
+        }
+    }
+}
+
+
 
 # Store a variety of title debugging information for later analysis
 # and debug output
@@ -3679,13 +3783,19 @@ sub make_ns_epnum () {
 
 	_d(3,'Make <episode-num>:',$episode_ns);
 
+    # delete existing 'xmltv_ns' details if no series/ep/part
+    # details are available
 	if ($episode_ns eq '..') {
-		# no series/ep/part details input.
-		# TODO: should we consider deleting any existing xmltv_ns <episode-num> element?
+        if (defined $prog->{'episode-num'}) {
+            @{$prog->{'episode-num'}} = map { $prog->{'episode-num'}[$_][1] eq 'xmltv_ns'
+                                            ? ()
+                                            : $prog->{'episode-num'}[$_]
+                                            } 0 .. $#{$prog->{'episode-num'}};
+        }
 		return '';
 	}
 
-	# find the 'xmltv_ns' details in the prog
+	# otherwise, find the 'xmltv_ns' details in the prog
 	my $xmltv_ns_old;
 	if (defined $prog->{'episode-num'}) {
 		foreach (@{$prog->{'episode-num'}}) {
@@ -3798,7 +3908,6 @@ sub trim {
 # open log file
 sub open_log (;$) {
 	my $fn = shift;
-	$fn = 'augment.log' if !defined $fn || $fn eq '';
 	my $mode = ($debug ? '>>' : '>');	# open append while debugging - avoids issue with tail on truncated files
 	open(my $fh, $mode, $fn)
 			or die "cannot open $fn: $!";
@@ -3809,8 +3918,10 @@ sub open_log (;$) {
 
 # close log file
 sub close_log () {
-	close($logh)
-			or warn "close failed on log file: $!";
+	if ($logh) {
+		close($logh)
+				or warn "close failed on log file: $!";
+	}
 }
 
 # write to log file

@@ -12,36 +12,36 @@ sudo: required
 language: bash
 
 env:
-  - release: debian_9
-    distro: debian
-    codename: stretch
   - release: debian_10
     distro: debian
     codename: buster
+  - release: debian_11
+    distro: debian
+    codename: bullseye
   - release: debian_sid
     distro: debian
     codename: sid
-  - release: ubuntu_1404_lts
-    distro: ubuntu
-    codename: trusty
   - release: ubuntu_1604_lts
     distro: ubuntu
-    codename: xenial
-  - release: ubuntu_1710
+    codename: trusty
+  - release: ubuntu_1804_lts
     distro: ubuntu
-    codename: artful
+    codename: bionic
+  - release: ubuntu_1910
+    distro: ubuntu
+    codename: eoan
   - release: centos_6
     distro: centos
     codename: 6
   - release: centos_7
     distro: centos
     codename: 7
-  - release: fedora_26
+  - release: fedora_29
     distro: fedora
-    codename: 26
-  - release: fedora_27
+    codename: 29
+  - release: fedora_30
     distro: fedora
-    codename: 27
+    codename: 30
 
 branches:
   only:

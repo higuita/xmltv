@@ -1,12 +1,10 @@
 # -*- mode: perl; coding: utf-8 -*- ###########################################
 #
-# tv_grab_fi: source specific grabber code for http://www.iltapulu.fi
+# tv_grab_fi: source specific grabber code for https://www.iltapulu.fi
 #
 ###############################################################################
 #
 # Setup
-#
-# VERSION: $Id$
 #
 # INSERT FROM HERE ############################################################
 package fi::source::iltapulu;
@@ -34,7 +32,7 @@ sub channels {
   my %channels;
 
   # Fetch & parse HTML
-  my $root = fetchTree("http://www.iltapulu.fi/?&all=1");
+  my $root = fetchTree("https://www.iltapulu.fi/?&all=1");
   if ($root) {
     #
     # Channel list can be found in table rows
@@ -86,7 +84,7 @@ sub grab {
   return unless my($channel) = ($id =~ /^([-\w]+)\.iltapulu\.fi$/);
 
   # Fetch & parse HTML
-  my $root = fetchTree("http://www.iltapulu.fi/?all=1&date=" . $today->ymdd());
+  my $root = fetchTree("https://www.iltapulu.fi/?all=1&date=" . $today->ymdd());
   if ($root) {
     my $count = 0;
     my @objects;

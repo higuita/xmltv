@@ -32,10 +32,10 @@ recoding or other processing) and tv_cat die with an error message.
 
 But if you do want to combine multiple input files with different
 character encodings then you can use the --utf8 command-line parameter
-which will create a combined output file in UTF-8 format. (Note: it is 
+which will create a combined output file in UTF-8 format. (Note: it is
 not safe to combine mixed encodings to anything other than UTF-8 so no
-other output encoding is provided for.) (Note 2: any input file which 
-does not have an encoding specified in the xml tag is not only naughty 
+other output encoding is provided for.) (Note 2: any input file which
+does not have an encoding specified in the xml tag is not only naughty
 but is assumed to already be UTF-8, which may not be true!)
 
 This tool is rather useless, but it makes a good testbed for the XMLTV
@@ -52,7 +52,8 @@ Ed Avis, ed@membled.com
 =cut
 
 use strict;
-use XMLTV::Version '$Id$ ';
+use XMLTV;
+use XMLTV::Version "$XMLTV::VERSION";
 use Getopt::Long;
 
 # Use Log::TraceMessages if installed.
@@ -69,7 +70,6 @@ BEGIN {
     }
 }
 
-use XMLTV;
 use XMLTV::Usage <<END
 $0: concatenate listings, merging channels, (optional: utf-8 output file)
 usage: $0 [--help] [--utf8] [--output FILE] [FILE...]

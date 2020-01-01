@@ -32,9 +32,6 @@
 #
 #   Morten Grouleff (morten@grouleff.com)
 #      - Rewritten to use the new JSON api instead of screenscraping from the html.
-#
-#
-# $Id$
 
 use strict;
 use warnings;
@@ -51,6 +48,7 @@ use LWP::UserAgent;
 use IO::Scalar;
 
 use DateTime;
+use Data::Dumper;
 
 # TODO: This ought be in a config file, I suppose. But for now, it lives here.
 my @title_fixups = (); # regexp => [ $title, $subtitle ]. Or when prefixed with "#", regexp => [ $title, #$episode-num ].
@@ -303,7 +301,7 @@ sub get_schedules($$$)
     print STDERR "Got: $content\n" if $debug;
 
     my @results = ();
-    
+
     my $parsed = ();
     eval {
 	$parsed = from_json( $content, { utf8  => 1 } );
@@ -334,7 +332,7 @@ sub get_schedules($$$)
 	    $p{'channel'} = $chan->{'id'};
 	    $p{'start'} = json_date_to_xmltv($listing->{'StartDateTime'});
 	    $p{'stop'} = json_date_to_xmltv($listing->{'EndDateTime'});
-	    
+
 	    my $title = $listing->{'Title'};
 	    if (@title_fixups && defined $title) {
 		my $subtitle = '';
@@ -382,7 +380,7 @@ sub get_schedules($$$)
 		    $p{'sub-title'} = [ [ $subtitle,
 					  $chan->{'_lang'} ] ];
 		}
-	    }	
+	    }
 
 	    my @title;
 	    push (@title, [ $title, $chan->{'_lang'} ]);
@@ -421,7 +419,7 @@ sub get_schedules($$$)
 		my $pl = $listing->{'Punchline'};
 		# Der er nogle gange linjeskift i
 		# punchlines, hvilket XMLTV ikke bryder
-		# sig om. 
+		# sig om.
 		$pl =~ s/\s*\n\s*/. /g;
 		$pl =~ s/\<br\>/. /g;
 		$description .= $pl;
@@ -438,8 +436,8 @@ sub get_schedules($$$)
 	    }
 	    if ($listing->{'DisplayHD'}) {
 		$p{'video'}{'quality'} = 'HDTV';
-	    } 
-	    
+	    }
+
 	    if ($listing->{'Display16_9'}) {
 		$p{'video'}{'aspect'} = '16:9';
 	    }
@@ -478,13 +476,13 @@ sub get_schedules($$$)
 
 my $opt;
 my $conf;
-( $opt, $conf ) = ParseOptions( {	
-    grabber_name => $grabber_name,	
+( $opt, $conf ) = ParseOptions( {
+    grabber_name => $grabber_name,
     capabilities => [qw/baseline manualconfig tkconfig apiconfig/],
     stage_sub => \&config_stage,
     listchannels_sub => \&list_channels,
     #load_old_config_sub => \&load_old_config,
-    version => '$Id$',
+    version => "$XMLTV::VERSION",
     description => "TV Oversigten fra Danmarks Radios (2012) ".
 	"(www.dr.dk/tjenester/programoversigt)",
 				} );

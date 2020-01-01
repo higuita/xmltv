@@ -74,7 +74,8 @@ Mattias Holmlund, mattias -at- holmlund -dot- se.
 
 use strict;
 
-use XMLTV::Version '$Id$';
+use XMLTV;
+use XMLTV::Version "$XMLTV::VERSION";
 use XMLTV::Capabilities qw/baseline manualconfig/;
 use XMLTV::Description "Combine data from several other grabbers";
 use XMLTV::Usage << "END";
@@ -171,7 +172,7 @@ sub grab_data {
 sub run_grabber {
   my( $grabber, $config ) = @_;
 
-  my( $fh, $filename ) = tempfile();
+  my( $fh, $filename ) = tempfile(UNLINK => 1);
   write_config( $config, $fh );
   close($fh);
 
@@ -192,7 +193,7 @@ sub configure_grabber {
 
   print "Configuring $grabber\n";
 
-  my( $fh, $filename ) = tempfile();
+  my( $fh, $filename ) = tempfile(UNLINK => 1);
   system( $grabber, '--configure', '--config-file', $filename );
 
   return read_config( $filename );

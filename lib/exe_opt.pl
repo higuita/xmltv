@@ -1,13 +1,10 @@
 #!perl -w
 #
-# $Id$
-#
 # This is a simple script to generate options so PerlApp can make the EXE
 # it needs time values, so might as well put it in a perl script!
 # (windows has a limited date function)
 #
 # Robert Eden rmeden@yahoo.com
-#
 
 use File::Spec;
 
@@ -32,7 +29,7 @@ print '-nologo
 -bind=libgcc_x86_470.dll[file=C:\strawberry\perl\bin\libgcc_x86_470.dll,extract]
 -bind=libeay32_.dll[file=C:\strawberry\c\bin\libeay32_.dll,extract]
 -bind=SSLeay32_.dll[file=C:\strawberry\c\bin\SSLeay32_.dll,extract]
--bind DateTime/Format/Builder/Parser/Regex.pm[file=c:\Strawberry\Perl\site\lib\DateTime\Format\Builder\Parser\Regex.pm,extract] 
+-bind DateTime/Format/Builder/Parser/Regex.pm[file=c:\Strawberry\Perl\site\lib\DateTime\Format\Builder\Parser\Regex.pm,extract]
 -trim=Class::MethodMaker::Scalar
 -trim=Class::MethodMaker::Engine
 -trim=JSON::PP58

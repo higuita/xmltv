@@ -3,9 +3,6 @@
 #
 # The second argument is the share directory for the final
 # installation.
-#
-# $Id$
-#
 
 use IO::File;
 my $out = shift @ARGV; die "no output file given" if not defined $out;
@@ -15,7 +12,7 @@ my $in = 'grab/huro/tv_grab_huro.in';
 my $in_fh = new IO::File "< $in" or die "cannot read $in: $!";
 my $out_fh = new IO::File "> $out" or die "cannot write to $out: $!";
 my $seen = 0;
-# example line: 
+# example line:
 #     my $SHARE_DIR = undef;
 while (<$in_fh>) {
     print $out_fh $_;

@@ -133,7 +133,7 @@ The entries in the hash configure the behaviour of ParseOptions.
 
   my( $opt, $conf ) = ParseOptions( {
     grabber_name => 'tv_grab_test',
-    version => '$Id$',
+    version => '1.2',
     description => 'Sweden (tv.swedb.se)',
     capabilities => [qw/baseline manualconfig apiconfig lineups/],
     stage_sub => \&config_stage,
@@ -246,7 +246,8 @@ for a region or country).
 
 =item version
 
-Required. This shall be a cvs Id field.
+Required. The version number of the grabber to be displayed. Supported version
+string formats include "x", "x.y", and "x.y.z".
 
 =item capabilities
 
@@ -305,7 +306,7 @@ Optional. A value to return when the grabber is called with the
 
   my( $opt, $conf ) = ParseOptions( {
     grabber_name => 'tv_grab_test',
-    version => '$Id$',
+    version => '1.2',
     description => 'Sweden (tv.swedb.se)',
     capabilities => [qw/baseline manualconfig apiconfig preferredmethod/],
     stage_sub => \&config_stage,
@@ -420,9 +421,13 @@ sub ParseOptions
 	} or print
 	    "could not load XMLTV module, xmltv is not properly installed\n";
 
-	if( $p->{version} =~ m!\$Id: [^,]+,v (\S+) ([0-9/: -]+)! )
+	if( $p->{version} =~ m/^(?:\d+)(?:\.\d+){0,2}$/)
 	{
-	    print "This is $p->{grabber_name} version $1, $2\n";
+	    print "This is $p->{grabber_name} version $p->{version}\n";
+	}
+	elsif( $p->{version} =~ m!\$Id: [^,]+,v (\S+) ([0-9/: -]+)! )
+	{
+	    print "This is $p->{grabber_name} version $1\n";
 	}
 	else
 	{
